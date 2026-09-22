@@ -1,0 +1,37 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["chrome", "node", "vite/client"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    // The UI is written against the React API but runs on Preact, so the
+    // specifiers resolve to `preact/compat` for the type checker exactly as the
+    // Vite alias resolves them for the bundler.
+    "paths": {
+      "react": ["../../node_modules/preact/compat"],
+      "react-dom": ["../../node_modules/preact/compat"],
+      "react-dom/client": ["../../node_modules/preact/compat/client"],
+      "react/jsx-runtime": ["../../node_modules/preact/jsx-runtime"]
+    },
+    "rootDir": ".",
+    "outDir": "build/types",
+    "tsBuildInfoFile": "build/types/.tsbuildinfo",
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedSideEffectImports": true,
+    "erasableSyntaxOnly": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tools/**/*.ts",
+    "vite.config.ts",
+    "manifest.config.ts",
+    "package.json"
+  ]
+}

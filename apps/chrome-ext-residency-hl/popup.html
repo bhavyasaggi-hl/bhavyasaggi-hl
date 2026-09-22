@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Residency Auditor</title>
+  </head>
+  <body>
+    <!-- Replaced by React on mount; present so the surface paints before the bundle parses. -->
+    <div id="root" role="status" aria-label="Loading">
+      <div class="flex w-[400px] flex-col">
+        <div class="border-line bg-sunken flex items-center gap-2 border-b px-3 py-2.5">
+          <div>
+            <h1 class="text-[13px] font-semibold">Residency Auditor</h1>
+            <p class="text-ink-muted m-0 text-[11px]">Starting…</p>
+          </div>
+        </div>
+        <div class="bg-line border-line grid grid-cols-4 gap-px border-b">
+          <div class="bg-surface px-2.5 py-2"><span class="bg-line block h-4 w-8 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-2 w-12 animate-pulse rounded"></span></div>
+          <div class="bg-surface px-2.5 py-2"><span class="bg-line block h-4 w-8 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-2 w-12 animate-pulse rounded"></span></div>
+          <div class="bg-surface px-2.5 py-2"><span class="bg-line block h-4 w-8 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-2 w-12 animate-pulse rounded"></span></div>
+          <div class="bg-surface px-2.5 py-2"><span class="bg-line block h-4 w-8 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-2 w-12 animate-pulse rounded"></span></div>
+        </div>
+        <div class="border-line border-b px-3 py-2"><span class="bg-line block h-3 w-40 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-2 w-52 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-1.5 w-full animate-pulse rounded"></span></div>
+        <div class="border-line border-b px-3 py-2"><span class="bg-line block h-3 w-40 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-2 w-52 animate-pulse rounded"></span><span class="bg-line mt-1.5 block h-1.5 w-full animate-pulse rounded"></span></div>
+      </div>
+    </div>
+    <script type="module" src="/src/ui/popup/main.tsx"></script>
+  </body>
+</html>

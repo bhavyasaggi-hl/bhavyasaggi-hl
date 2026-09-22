@@ -1,0 +1,134 @@
+# Policy for tools/manual/test-page.html.
+#
+# Each item targets one host the page calls, so the panel groups the run the
+# way the page is organised. Assertions are chosen to PASS for the cases that
+# should succeed, which makes a red row a finding rather than noise — except in
+# the item named "expected to fail", which exists to prove failures render.
+#
+# A strict subset of the OpenCollection schema, like every policy here.
+# Schema: https://schema.opencollection.com/opencollection/v1.0.0.json
+
+opencollection: '1.0.0'
+
+info:
+  name: Capture test page
+  summary: Exercises the extension against tools/manual/test-page.html.
+  version: '1'
+
+items:
+  # Everything, so no request goes unjudged and the unscoped count stays at zero.
+  - info:
+      name: Baseline
+      type: http
+      description: Holds for every request the page makes.
+      seq: 1
+    http:
+      url: '*'
+    runtime:
+      assertions:
+        - { description: 'a method is always recorded', expression: req.method, operator: isNotEmpty }
+        - { description: 'a host is always recorded', expression: req.host, operator: isNotEmpty }
+        - { description: 'the scheme is https', expression: res.protocol, operator: equals, value: https }
+        - { description: 'duration is measured', expression: res.responseTime, operator: gte, value: '0' }
+
+  # The JSON API the script-initiated cases call. This is the item that stays
+  # empty if fetch and XHR are not reaching the extension.
+  - info:
+      name: JSON API · fetch and XHR
+      type: http
+      description: Cases 11-15 and 20-24. Silence here means script-initiated requests are being missed.
+      seq: 2
+      tags:
+        - fetch
+        - xhr
+    http:
+      url: jsonplaceholder.typicode.com
+    runtime:
+      assertions:
+        - { description: 'answered successfully', expression: res.status, operator: lt, value: '300' }
+        - { description: 'answered as JSON', expression: "res.headers['content-type']", operator: contains, value: application/json }
+        - { description: 'responder has an address', expression: res.ip, operator: isNotEmpty }
+      scripts:
+        - type: tests
+          code: |-
+            test("the case id survived into the url", function () {
+              expect(req.url).to.match(/[?&]case=\d+/);
+            });
+
+            test("a JSON body can be read and decoded", function () {
+              if (res.body === undefined) {
+                return; // payloads are only fetched when a policy asks for one
+              }
+              expect(res.body).to.be.an('object');
+            });
+
+  # Deliberately failing statuses. Cases 16 and 17.
+  - info:
+      name: Error statuses · expected to fail
+      type: http
+      description: Cases 16 and 17 return 404 and 500, so these rows should be red.
+      seq: 3
+    http:
+      url: httpbin.org
+    runtime:
+      assertions:
+        - { description: 'this one is meant to fail on 404 and 500', expression: res.status, operator: lt, value: '400' }
+        - { description: 'the slow case stays under three seconds', expression: res.responseTime, operator: lt, value: '3000' }
+
+  # Static assets, to prove tag scoping picks the browser-initiated loads.
+  - info:
+      name: Static assets
+      type: http
+      description: Cases 02-05. Scoped by resource type rather than by host.
+      seq: 4
+      tags:
+        - script
+        - stylesheet
+        - image
+        - font
+    http:
+      url: '*'
+    runtime:
+      assertions:
+        - { description: 'assets are served over TLS', expression: req.url, operator: startsWith, value: 'https://' }
+        - { description: 'assets have a body', expression: res.status, operator: equals, value: '200' }
+
+  # The beacon. Case 06.
+  - info:
+      name: Beacon
+      type: http
+      description: Case 06, sent with navigator.sendBeacon.
+      seq: 5
+      tags:
+        - ping
+    http:
+      url: '*'
+      method: POST
+    runtime:
+      assertions:
+        - { description: 'a beacon is a POST', expression: req.method, operator: equals, value: POST }
+
+  # Reading a request payload. Cases 13, 14 and 21 send JSON bodies; naming
+  # req.body here is what makes the panel pull payloads at all.
+  - info:
+      name: Request payloads
+      type: http
+      description: Cases 13, 14 and 21. Asserting on req.body switches payload capture on.
+      seq: 6
+      tags:
+        - fetch
+        - xhr
+    http:
+      url: jsonplaceholder.typicode.com
+      method: POST
+    runtime:
+      assertions:
+        - { description: 'the request carried a body', expression: req.body, operator: isDefined }
+
+extensions:
+  residency:
+    grouping: host
+    clearOnNavigate: false
+    recordUnscoped: true
+    recordByDefault: false
+    debug: true

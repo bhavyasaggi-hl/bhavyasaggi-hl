@@ -1,0 +1,52 @@
+{
+  "name": "chrome-ext-residency-hl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension that audits every network request made by a tab against OpenCollection runtime-assertions and reports per-domain compliance.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "clean": "rm -rf dist build/types",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "tsc --build",
+    "knip": "knip",
+    "verify": "node --experimental-strip-types tools/verify/conformance.ts && node --experimental-strip-types tools/verify/engine.ts && node --experimental-strip-types tools/verify/capture.ts && node --experimental-strip-types tools/verify/capture-stream.ts && node --experimental-strip-types tools/verify/sandbox.ts && node --experimental-strip-types tools/verify/worker.ts && node --experimental-strip-types tools/verify/hydrate.ts",
+    "bench": "node --experimental-strip-types tools/verify/bench.ts",
+    "preview": "yarn build && node tools/preview/build.mjs",
+    "audit:a11y": "yarn preview && node tools/preview/axe.mjs",
+    "qa": "yarn lint && yarn typecheck && yarn knip && yarn verify && yarn audit:a11y",
+    "ingest": "node --experimental-strip-types tools/manual/ingest-export.ts",
+    "testpage": "python3 -m http.server 8080 --directory tools/manual"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-yaml": "^6.1.3",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.5",
+    "@codemirror/view": "^6.43.12",
+    "@lezer/highlight": "^1.2.3",
+    "@tanstack/react-virtual": "^3.14.13",
+    "chai": "^6.2.2",
+    "preact": "^10.29.8",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.7.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/chai": "^5.2.3",
+    "@types/chrome": "^0.3.0",
+    "@types/har-format": "^1.2.16",
+    "@types/node": "^22",
+    "ajv": "^8.20.0",
+    "axe-core": "^4.13.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0"
+  }
+}

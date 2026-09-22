@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@source "../ui";
+@source "../../*.html";
+
+/*
+ * Design tokens. Every surface — popup, DevTools panel, options — reads these,
+ * and the dark values follow the OS so the panel matches DevTools' own theme.
+ */
+/*
+ * Token pairs are checked for WCAG AA contrast (>= 4.5:1 for text) in both
+ * schemes; `warn` and `na` are deliberately darker/lighter than a typical
+ * amber and grey for that reason.
+ */
+@theme {
+  --color-surface: #ffffff;
+  --color-sunken: #f5f6f8;
+  --color-raised: #ffffff;
+  --color-line: #dfe3e8;
+  --color-line-strong: #c3cad3;
+  --color-ink: #16191d;
+  --color-ink-muted: #5c6773;
+  --color-brand: #2f5bea;
+  --color-brand-ink: #ffffff;
+
+  --color-pass: #1e7b4f;
+  --color-pass-soft: #e3f4ea;
+  --color-warn: #8a6100;
+  --color-warn-soft: #fbf1d8;
+  --color-fail: #c0392b;
+  --color-fail-soft: #fbe6e3;
+  --color-na: #5c6773;
+  --color-na-soft: #eceff2;
+
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer theme {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-surface: #14171b;
+      --color-sunken: #0f1216;
+      --color-raised: #1b1f25;
+      --color-line: #2a3039;
+      --color-line-strong: #3a424d;
+      --color-ink: #e7eaee;
+      --color-ink-muted: #9aa5b1;
+      --color-brand: #7d9bff;
+      --color-brand-ink: #10131a;
+
+      --color-pass: #56c08a;
+      --color-pass-soft: #14301f;
+      --color-warn: #e0b84f;
+      --color-warn-soft: #332a12;
+      --color-fail: #ef7a6d;
+      --color-fail-soft: #3a1c19;
+      --color-na: #8b95a1;
+      --color-na-soft: #22272e;
+    }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  html,
+  body {
+    margin: 0;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
+  }
+
+  /* The loading skeletons pulse; nothing here is worth triggering vestibular
+     discomfort over. `!important` is the point — this has to beat the utility
+     classes that set the animation in the first place. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      /* biome-ignore lint/complexity/noImportantStyles: must beat the utility that set it */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: must beat the utility that set it */
+      animation-iteration-count: 1 !important;
+      /* biome-ignore lint/complexity/noImportantStyles: must beat the utility that set it */
+      transition-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: must beat the utility that set it */
+      scroll-behavior: auto !important;
+    }
+  }
+}

@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Residency capture test page</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --line: #d5d9e0;
+        --ink-muted: #5c6773;
+        --ok: #1e7b4f;
+        --bad: #c0392b;
+        --card: #ffffff;
+        --bg: #f5f6f8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --line: #2a3039;
+          --ink-muted: #9aa5b1;
+          --ok: #56c08a;
+          --bad: #ef7a6d;
+          --card: #14171b;
+          --bg: #0f1216;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px 16px 64px;
+        background: var(--bg);
+        font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 1040px; margin: 0 auto; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p.lede { color: var(--ink-muted); margin: 0 0 20px; max-width: 74ch; }
+      section {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+      }
+      h2 { font-size: 14px; margin: 0 0 8px; }
+      .muted { color: var(--ink-muted); }
+      button {
+        font: inherit;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      button.primary { border-color: #2f5bea; background: #2f5bea; color: #fff; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 4px 8px 4px 0; vertical-align: top; }
+      th { color: var(--ink-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+      td.mono, th.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      tr.done td.state { color: var(--ok); }
+      tr.err td.state { color: var(--bad); }
+      td.state.err { color: var(--bad); }
+      .count { font-variant-numeric: tabular-nums; }
+      label { display: inline-flex; gap: 6px; align-items: center; }
+      #log { max-height: 320px; overflow: auto; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Residency capture test page</h1>
+      <p class="lede">
+        Fires one request of every kind the extension can see, each tagged with a
+        <code>case</code> id so an export can be matched against it request by request.
+        Serve this over http — <code>python3 -m http.server</code> in this folder — because
+        cross-origin requests from <code>file://</code> carry a null origin and are refused.
+      </p>
+
+      <section>
+        <h2>Run</h2>
+        <div class="row">
+          <button id="run" class="primary" type="button">Run every case</button>
+          <button id="run-script" type="button">Script-initiated only (fetch / XHR)</button>
+          <button id="run-browser" type="button">Browser-initiated only</button>
+          <button id="save" type="button">Download expectations</button>
+          <span class="muted count" id="summary">nothing run yet</span>
+        </div>
+        <p class="muted" style="margin: 10px 0 0">
+          Record the tab in the extension <em>before</em> running, then export from the panel
+          with every filter cleared. Feed both files to
+          <code>yarn ingest &lt;export.json&gt; &lt;expectations.json&gt;</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Cases</h2>
+        <table>
+          <thead>
+            <tr>
+              <th class="mono">case</th>
+              <th>what it exercises</th>
+              <th class="mono">method</th>
+              <th class="mono">expected type</th>
+              <th>preflight</th>
+              <th>result</th>
+            </tr>
+          </thead>
+          <tbody id="cases"></tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Log</h2>
+        <table id="log">
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <!-- Browser-initiated loads are injected here so they are easy to re-run. -->
+      <div id="sink" hidden></div>
+    </main>
+
+    <script>'use strict';
+      // ---------------------------------------------------------------------
+      // Endpoints. Swap these if one is down — every case carries its own host
+      // so a single outage does not invalidate the rest of the run.
+      // ---------------------------------------------------------------------
+      const JSONPH = 'https://jsonplaceholder.typicode.com';
+      const HTTPBIN = 'https://httpbin.org';
+      const ECHO = 'https://echo.free.beeceptor.com';
+      const IMG = 'https://placehold.co';
+      const CDN = 'https://cdnjs.cloudflare.com';
+
+      /** Every case, in the order they are fired. */
+      const CASES = [
+        // --- browser-initiated -------------------------------------------------
+        { id: '01', group: 'browser', label: 'document in an iframe', method: 'GET', type: 'document',
+          preflight: false, run: (u) => frame(u(location.pathname + '?embedded=1')) },
+        { id: '02', group: 'browser', label: 'stylesheet via <link>', method: 'GET', type: 'stylesheet',
+          preflight: false, run: (u) => css(u(`${CDN}/ajax/libs/normalize/8.0.1/normalize.min.css`)) },
+        { id: '03', group: 'browser', label: 'script via <script src>', method: 'GET', type: 'script',
+          preflight: false, run: (u) => script(u(`${CDN}/ajax/libs/lodash.js/4.17.21/lodash.min.js`)) },
+        { id: '04', group: 'browser', label: 'image via <img>', method: 'GET', type: 'image',
+          preflight: false, run: (u) => image(u(`${IMG}/80x80.png`)) },
+        { id: '05', group: 'browser', label: 'font, pulled by a stylesheet', method: 'GET', type: 'stylesheet',
+          preflight: false, run: (u) => css(u('https://fonts.googleapis.com/css2?family=Inter:wght@400')) },
+        { id: '06', group: 'browser', label: 'beacon via sendBeacon', method: 'POST', type: 'ping',
+          preflight: false, run: (u) => beacon(u(`${ECHO}/beacon`)) },
+
+        // --- script-initiated: the ones onRequestFinished may be missing --------
+        { id: '10', group: 'script', label: 'fetch, same origin', method: 'GET', type: 'fetch',
+          preflight: false, run: (u) => req(u(location.pathname)) },
+        { id: '11', group: 'script', label: 'fetch, cross origin, simple', method: 'GET', type: 'fetch',
+          preflight: false, run: (u) => req(u(`${JSONPH}/todos/1`)) },
+        { id: '12', group: 'script', label: 'fetch with a custom header', method: 'GET', type: 'fetch',
+          preflight: true, run: (u) => req(u(`${JSONPH}/todos/2`), { headers: { 'x-residency-case': '12' } }) },
+        { id: '13', group: 'script', label: 'fetch POST, JSON body', method: 'POST', type: 'fetch',
+          preflight: true, run: (u) => req(u(`${JSONPH}/posts`), {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ case: '13', region: 'eu-west-1' }) }) },
+        { id: '14', group: 'script', label: 'fetch PUT', method: 'PUT', type: 'fetch',
+          preflight: true, run: (u) => req(u(`${JSONPH}/posts/1`), {
+            method: 'PUT', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ case: '14' }) }) },
+        { id: '15', group: 'script', label: 'fetch DELETE', method: 'DELETE', type: 'fetch',
+          preflight: true, run: (u) => req(u(`${JSONPH}/posts/2`), { method: 'DELETE' }) },
+        { id: '16', group: 'script', label: 'fetch that 404s', method: 'GET', type: 'fetch',
+          preflight: false, status: 404, run: (u) => req(u(`${HTTPBIN}/status/404`)) },
+        { id: '17', group: 'script', label: 'fetch that 500s', method: 'GET', type: 'fetch',
+          preflight: false, status: 500, run: (u) => req(u(`${HTTPBIN}/status/500`)) },
+        { id: '18', group: 'script', label: 'fetch to a host that does not resolve', method: 'GET', type: 'fetch',
+          preflight: false, networkError: true, run: (u) => req(u('https://does-not-resolve.invalid/x')) },
+        { id: '19', group: 'script', label: 'fetch that takes two seconds', method: 'GET', type: 'fetch',
+          preflight: false, run: (u) => req(u(`${HTTPBIN}/delay/2`)) },
+        { id: '20', group: 'script', label: 'XMLHttpRequest GET', method: 'GET', type: 'xhr',
+          preflight: false, run: (u) => xhr('GET', u(`${JSONPH}/todos/3`)) },
+        { id: '21', group: 'script', label: 'XMLHttpRequest POST, JSON body', method: 'POST', type: 'xhr',
+          preflight: true, run: (u) => xhr('POST', u(`${JSONPH}/posts`), '{"case":"21"}') },
+        { id: '22', group: 'script', label: 'fetch returning a JSON body', method: 'GET', type: 'fetch',
+          preflight: false, run: (u) => req(u(`${JSONPH}/users/1`)) },
+        { id: '23', group: 'script', label: 'fetch returning a larger body', method: 'GET', type: 'fetch',
+          preflight: false, run: (u) => req(u(`${JSONPH}/photos?_limit=200`)) },
+        { id: '24', group: 'script', label: 'fetch that redirects', method: 'GET', type: 'fetch',
+          preflight: false, run: (u) => req(u(`${HTTPBIN}/redirect-to?url=${encodeURIComponent(`${JSONPH}/todos/4`)}`)) },
+        { id: '25', group: 'script', label: 'preflight that is refused, so no request follows', method: 'GET', type: 'preflight',
+          preflight: true, expectOrphanPreflight: true,
+          run: (u) => req(u(`${IMG}/10x10.png`), { headers: { 'x-not-allowed-by-this-host': '1' } }) },
+        { id: '26', group: 'script', label: 'websocket upgrade', method: 'GET', type: 'websocket',
+          preflight: false, run: (u) => socket(u('wss://echo.websocket.events/')) },
+        // Fired together, so they share a method, a url and a millisecond. The
+        // capture side used to key its deduplication on exactly those three and
+        // reported one of the five.
+        { id: '27', group: 'script', label: 'five identical requests in parallel', method: 'GET',
+          type: 'fetch', preflight: false, expectedCount: 5,
+          run: (u) => Promise.all(
+            Array.from({ length: 5 }, () => req(u(`${JSONPH}/todos/5`))),
+          ).then((all) => all.join(', ')) },
+      ];
+
+      // ---------------------------------------------------------------------
+      // Firing
+      // ---------------------------------------------------------------------
+      const started = new Date().toISOString();
+      const results = new Map();
+
+      /** Tags a url with its case id so an export can be matched back to it. */
+      function tagger(id) {
+        return (raw) => {
+          const url = new URL(raw, location.href);
+          url.searchParams.set('case', id);
+          return url.toString();
+        };
+      }
+
+      // Cells are built with textContent, never innerHTML. Several case labels
+      // contain literal markup — "script via <script src>" — and assigning that
+      // to innerHTML makes the parser open a real <script> element that eats the
+      // rest of the row, so the .state cell never exists.
+      function cell(text, className) {
+        const td = document.createElement('td');
+        if (className) {
+          td.className = className;
+        }
+        td.textContent = text;
+        return td;
+      }
+
+      function log(id, text, bad) {
+        const body = document.querySelector('#log tbody');
+        const tr = document.createElement('tr');
+        tr.append(cell(id, 'mono'), cell(text, bad ? 'state err' : 'state'));
+        body.prepend(tr);
+      }
+
+      function mark(id, text, bad) {
+        const row = document.querySelector(`tr[data-case="${id}"]`);
+        if (row) {
+          row.className = bad ? 'err' : 'done';
+          const state = row.querySelector('.state');
+          if (state) {
+            state.textContent = text;
+          }
+        }
+        log(id, text, bad);
+      }
+
+      const sink = () => document.getElementById('sink');
+
+      function frame(url) {
+        return new Promise((resolve) => {
+          const el = document.createElement('iframe');
+          el.src = url;
+          el.width = '0';
+          el.height = '0';
+          el.addEventListener('load', () => resolve('loaded'));
+          el.addEventListener('error', () => resolve('error'));
+          sink().append(el);
+          setTimeout(() => resolve('loaded (assumed)'), 4000);
+        });
+      }
+
+      function css(url) {
+        return new Promise((resolve) => {
+          const el = document.createElement('link');
+          el.rel = 'stylesheet';
+          el.href = url;
+          el.addEventListener('load', () => resolve('loaded'));
+          el.addEventListener('error', () => resolve('error'));
+          sink().append(el);
+          setTimeout(() => resolve('loaded (assumed)'), 4000);
+        });
+      }
+
+      function script(url) {
+        return new Promise((resolve) => {
+          const el = document.createElement('script');
+          el.src = url;
+          el.addEventListener('load', () => resolve('loaded'));
+          el.addEventListener('error', () => resolve('error'));
+          sink().append(el);
+          setTimeout(() => resolve('loaded (assumed)'), 4000);
+        });
+      }
+
+      function image(url) {
+        return new Promise((resolve) => {
+          const el = document.createElement('img');
+          el.src = url;
+          el.alt = '';
+          el.addEventListener('load', () => resolve('loaded'));
+          el.addEventListener('error', () => resolve('error'));
+          sink().append(el);
+          setTimeout(() => resolve('loaded (assumed)'), 4000);
+        });
+      }
+
+      function beacon(url) {
+        const sent = navigator.sendBeacon(url, JSON.stringify({ case: 'beacon' }));
+        return Promise.resolve(sent ? 'queued' : 'refused');
+      }
+
+      async function req(url, init) {
+        const response = await fetch(url, init);
+        return `${response.status} ${response.statusText || ''}`.trim();
+      }
+
+      function xhr(method, url, body) {
+        return new Promise((resolve, reject) => {
+          const request = new XMLHttpRequest();
+          request.open(method, url);
+          if (body !== undefined) {
+            request.setRequestHeader('content-type', 'application/json');
+          }
+          request.addEventListener('load', () => resolve(String(request.status)));
+          request.addEventListener('error', () => reject(new Error('network error')));
+          request.send(body);
+        });
+      }
+
+      // An upgrade that never happens is the page's failure, not the extension's,
+      // so it throws — that is what puts "the page itself failed here" in the
+      // analyser instead of blaming the capture layer for a missing record.
+      function socket(url) {
+        return new Promise((resolve, reject) => {
+          const ws = new WebSocket(url);
+          const timer = setTimeout(() => {
+            ws.close();
+            reject(new Error('websocket upgrade timed out'));
+          }, 4000);
+          const settle = (run) => {
+            clearTimeout(timer);
+            run();
+          };
+          ws.addEventListener('open', () => settle(() => {
+            ws.close();
+            resolve('opened');
+          }));
+          ws.addEventListener('error', () => settle(() => {
+            reject(new Error('websocket upgrade refused'));
+          }));
+        });
+      }
+
+      async function runCase(entry) {
+        mark(entry.id, 'running…', false);
+        try {
+          const outcome = await entry.run(tagger(entry.id));
+          results.set(entry.id, { ok: true, outcome: String(outcome) });
+          mark(entry.id, String(outcome), false);
+        } catch (cause) {
+          const message = String((cause && cause.message) || cause);
+          // A refused preflight and an unresolvable host are supposed to throw.
+          const expected = entry.networkError === true || entry.expectOrphanPreflight === true;
+          results.set(entry.id, { ok: expected, outcome: message });
+          mark(entry.id, expected ? `${message} (expected)` : message, !expected);
+        }
+        summarise();
+      }
+
+      async function runGroup(group) {
+        const chosen = CASES.filter((entry) => group === 'all' || entry.group === group);
+        for (const entry of chosen) {
+          // Sequential, so the log order matches the order the browser saw them.
+          await runCase(entry);
+        }
+      }
+
+      function summarise() {
+        const done = results.size;
+        const bad = [...results.values()].filter((r) => !r.ok).length;
+        document.getElementById('summary').textContent =
+          `${done} of ${CASES.length} fired` + (bad > 0 ? ` · ${bad} unexpected failure(s)` : '');
+      }
+
+      /**
+       * What the page says it fired, for the analyser to diff an export against.
+       */
+      function expectations() {
+        return {
+          startedAt: started,
+          page: location.href,
+          cases: CASES.map((entry) => ({
+            case: entry.id,
+            group: entry.group,
+            label: entry.label,
+            method: entry.method,
+            expectedType: entry.type,
+            expectsPreflight: entry.preflight === true,
+            expectsOrphanPreflight: entry.expectOrphanPreflight === true,
+            expectsNetworkError: entry.networkError === true,
+            expectedStatus: entry.status,
+            expectedCount: entry.expectedCount ?? 1,
+            fired: results.get(entry.id) ?? null,
+          })),
+        };
+      }
+
+      function download() {
+        const blob = new Blob([JSON.stringify(expectations(), null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'residency-expectations.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      // ---------------------------------------------------------------------
+      // Wiring
+      // ---------------------------------------------------------------------
+      const tbody = document.getElementById('cases');
+      for (const entry of CASES) {
+        const tr = document.createElement('tr');
+        tr.dataset.case = entry.id;
+        tr.append(
+          cell(entry.id, 'mono'),
+          cell(entry.label),
+          cell(entry.method, 'mono'),
+          cell(entry.type, 'mono'),
+          cell(entry.preflight ? 'yes' : '—'),
+          cell('not run', 'state muted'),
+        );
+        tbody.append(tr);
+      }
+
+      document.getElementById('run').addEventListener('click', () => void runGroup('all'));
+      document.getElementById('run-script').addEventListener('click', () => void runGroup('script'));
+      document.getElementById('run-browser').addEventListener('click', () => void runGroup('browser'));
+      document.getElementById('save').addEventListener('click', download);
+
+      // An embedded copy is only here to be a `document` request; it must not
+      // fire everything again.
+      if (new URLSearchParams(location.search).get('embedded') === '1') {
+        document.body.innerHTML = '<p style="font:14px system-ui;padding:8px">Embedded frame — case 01.</p>';
+      }
+    </script>
+  </body>
+</html>

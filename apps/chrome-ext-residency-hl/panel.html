@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Residency</title>
+  </head>
+  <body class="h-screen overflow-hidden">
+    <!-- Replaced by React on mount; present so the surface paints before the bundle parses. -->
+    <div id="root" role="status" aria-label="Loading">
+      <div class="flex h-screen flex-col">
+        <div class="border-line bg-sunken h-[30px] border-b"></div>
+        <div class="border-line bg-sunken h-[28px] border-b"></div>
+        <div class="p-2">
+          <span class="bg-line mb-1 block h-4 w-full animate-pulse rounded"></span>
+          <span class="bg-line mb-1 block h-4 w-full animate-pulse rounded"></span>
+          <span class="bg-line mb-1 block h-4 w-full animate-pulse rounded"></span>
+          <span class="bg-line mb-1 block h-4 w-full animate-pulse rounded"></span>
+          <p class="text-ink-muted mt-3 text-center">Connecting to the recorder…</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/ui/panel/main.tsx"></script>
+  </body>
+</html>

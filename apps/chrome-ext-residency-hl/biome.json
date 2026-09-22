@@ -1,0 +1,146 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "root": false,
+  "extends": "//",
+  "javascript": {
+    "globals": ["chrome", "LanguageModel"]
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "linter": {
+    "domains": {
+      "react": "all",
+      "solid": "none"
+    },
+    "rules": {
+      "correctness": {
+        "useQwikValidLexicalScope": "off",
+        "noUnresolvedImports": "off"
+      },
+      "complexity": {
+        "noVoid": "off",
+        "useLiteralKeys": "off",
+        "noExcessiveCognitiveComplexity": "error"
+      },
+      "style": {
+        "noTernary": "off",
+        "noMagicNumbers": "off",
+        "noHexColors": "off",
+        "noJsxLiterals": "off",
+        "useExportsLast": "off",
+        "useGlobalThis": "off",
+        "useNamingConvention": {
+          "level": "error",
+          "options": {
+            "strictCase": false,
+            "conventions": [
+              {
+                "selector": {
+                  "kind": "objectLiteralProperty"
+                },
+                "formats": ["camelCase", "CONSTANT_CASE", "PascalCase", "snake_case"]
+              },
+              {
+                "selector": {
+                  "kind": "typeProperty"
+                },
+                "formats": ["camelCase", "PascalCase", "snake_case"],
+                "match": "_?(.+)"
+              }
+            ]
+          }
+        }
+      },
+      "suspicious": {
+        "noUnnecessaryConditions": "off",
+        "noUnknownAttribute": "off"
+      },
+      "performance": {
+        "useTopLevelRegex": "off",
+        "noJsxPropsBind": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["vite.config.ts", "manifest.config.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          },
+          "correctness": {
+            "noNodejsModules": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tools/**", "build/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "off"
+          },
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/shared/logger.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/engine/ip.ts", "tools/icons.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noBitwiseOperators": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/ui/panel/RequestTable.tsx", "src/ui/panel/DetailPane.tsx"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useSemanticElements": "off",
+            "useFocusableInteractive": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tools/verify/**", "tools/preview/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off",
+            "useNamingConvention": "off",
+            "useBlockStatements": "off"
+          },
+          "suspicious": {
+            "noProto": "off",
+            "useAwait": "off",
+            "noConsole": "off"
+          },
+          "correctness": {
+            "noNodejsModules": "off"
+          }
+        }
+      }
+    }
+  ]
+}

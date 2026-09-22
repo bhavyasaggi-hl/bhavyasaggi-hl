@@ -1,0 +1,30 @@
+{
+  "name": "bhavyasaggi-hl",
+  "version": "0.0.0",
+  "private": true,
+  "repository": "https://github.com/bhavyasaggi-hl/bhavyasaggi-hl.git",
+  "author": "bhavyasaggi-hl",
+  "license": "MIT",
+  "packageManager": "yarn@1.22.19",
+  "workspaces": [
+    "apps/*",
+    "libs/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "prepare": "husky",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
+    "typecheck": "tsc --build",
+    "workspaces:check": "sherif"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "dotenv": "^18.0.2",
+    "husky": "^9.1.7",
+    "knip": "^6.37.0",
+    "sherif": "^1.13.0",
+    "typescript": "^7.0.2"
+  }
+}

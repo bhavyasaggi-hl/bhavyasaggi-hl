@@ -1,0 +1,390 @@
+# Exhaustive manual-test policy.
+#
+# Paste the whole file into the options page and save. It exercises every field
+# this extension reads, every operator, every expression, every scope form and
+# both script paths — against ordinary traffic, so it produces results on any
+# site you open.
+#
+# Most assertions are written to PASS anywhere, so a red row means something is
+# actually wrong. The items that are meant to fail say so in their name.
+#
+# Validated against the published OpenCollection schema by `yarn verify`.
+
+opencollection: '1.0.0'
+
+# --- info -------------------------------------------------------------------
+# Every field `Info` allows. Only `name` is read; the rest prove they are
+# tolerated rather than warned about.
+info:
+  name: Exhaustive manual test
+  summary: Covers every supported field, operator and expression.
+  version: '1'
+  authors:
+    - name: Manual tester
+
+# Schema-defined root keys this extension does not read. Present to prove a
+# fuller collection does not draw warnings for fields it is entitled to carry.
+docs: Paste into the options page and save.
+bundled: true
+
+items:
+  # ===========================================================================
+  # 1. Universal rules — url '*' covers every request the tab makes.
+  #    These should all pass on any https site.
+  # ===========================================================================
+  - info:
+      name: 1 · Universal
+      type: http
+      description: Holds for any well-behaved request, whatever the site.
+      seq: 1
+    http:
+      url: '*'
+    runtime:
+      assertions:
+        # -- string operators
+        - { description: 'startsWith · transport is encrypted', expression: req.url, operator: startsWith, value: 'https://' }
+        - { description: 'endsWith · scheme is a secure one', expression: res.protocol, operator: endsWith, value: s }
+        - { description: 'contains · url contains its host', expression: req.url, operator: contains, value: '//' }
+        - { description: 'notContains · url is not a data uri', expression: req.url, operator: notContains, value: 'data:' }
+        - { description: 'matches · path starts with a slash', expression: req.path, operator: matches, value: '^/' }
+        - { description: 'notMatches · host is not an ip literal', expression: req.host, operator: notMatches, value: '^\d+\.\d+\.\d+\.\d+$' }
+
+        # -- equality and ordering
+        - { description: 'equals · protocol is https (the bare scheme, no colon)', expression: res.protocol, operator: equals, value: https }
+        - { description: 'notEquals · method is not TRACE', expression: req.method, operator: notEquals, value: TRACE }
+        - { description: 'gt · status is above 99', expression: res.status, operator: gt, value: '99' }
+        - { description: 'gte · duration is not negative', expression: res.responseTime, operator: gte, value: '0' }
+        - { description: 'lt · status is below 600', expression: res.status, operator: lt, value: '600' }
+        - { description: 'lte · status is at most 599', expression: res.status, operator: lte, value: '599' }
+        - { description: 'between · status is a valid code', expression: res.status, operator: between, value: '100,599' }
+
+        # -- membership
+        - { description: 'in · method is a known verb', expression: req.method, operator: in, value: 'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS' }
+        - { description: 'notIn · method is not a rare verb', expression: req.method, operator: notIn, value: 'TRACE, CONNECT' }
+
+        # -- presence
+        - { description: 'isDefined · a method is always known', expression: req.method, operator: isDefined }
+        - { description: 'isNotEmpty · host is present', expression: req.host, operator: isNotEmpty }
+        - { description: 'isUndefined · no network error', expression: res.error, operator: isUndefined }
+        - { description: 'isTruthy · url is truthy', expression: req.url, operator: isTruthy }
+
+        # -- types
+        - { description: 'isString · host is a string', expression: req.host, operator: isString }
+        - { description: 'isNumber · status is a number', expression: res.status, operator: isNumber }
+        - { description: 'isBoolean · fromCache is a boolean', expression: res.fromCache, operator: isBoolean }
+
+        # -- length, written as a comparison
+        - { description: 'length · path is not empty', expression: req.path, operator: length, value: '> 0' }
+
+        # -- CIDR, with ranges that cover every address
+        - { description: 'inCidr · responder has an address', expression: res.ip, operator: inCidr, value: '0.0.0.0/0, ::/0' }
+        - { description: 'notInCidr · responder is not in TEST-NET-1', expression: res.ip, operator: notInCidr, value: '192.0.2.0/24' }
+
+  # ===========================================================================
+  # 2. Operators that need a shape the universal set cannot guarantee.
+  #    Disabled so they stay documented without adding noise — turn one on by
+  #    deleting its `disabled` line.
+  # ===========================================================================
+  - info:
+      name: 2 · Remaining operators
+      type: http
+      description: The rest. Three need a JSON body, so they are off until you point this at one.
+      seq: 2
+    http:
+      url: '*'
+    runtime:
+      assertions:
+        - { description: 'isNull · a genuinely null value', expression: res.body.nothing, operator: isNull, disabled: true }
+        - { description: 'isEmpty · a path that resolves to nothing', expression: "req.query['not-a-real-parameter']", operator: isEmpty }
+        - { description: 'isFalsy · no error means falsy', expression: res.error, operator: isFalsy }
+        - { description: 'isArray · a JSON array body', expression: res.body, operator: isArray, disabled: true }
+        - { description: 'isJson · body parsed as JSON', expression: res.body, operator: isJson, disabled: true }
+
+  # ===========================================================================
+  # 3. Scope forms. Each item shows one way to say which requests it covers.
+  # ===========================================================================
+
+  # 3a. Glob on a host. A pattern with no scheme is matched against the host as
+  #     well as the URL, so this needs no protocol or path.
+  - info:
+      name: 3a · Glob host
+      type: http
+      description: Any subdomain of github.com. Retarget at a host you use.
+      seq: 3
+    http:
+      url: '*.github.com'
+    runtime:
+      assertions:
+        - { description: 'reached over TLS', expression: req.url, operator: startsWith, value: 'https://' }
+
+  # 3b. A leading dot means "this domain and its subdomains".
+  - info:
+      name: 3b · Domain and subdomains
+      type: http
+      description: google.com and everything under it.
+      seq: 4
+    http:
+      url: .google.com
+    runtime:
+      assertions:
+        - { description: 'answered without a network error', expression: res.error, operator: isUndefined }
+
+  # 3c. A regular expression, which is also how you exclude — the schema has no
+  #     exclusion list, so a negative lookahead does that job.
+  - info:
+      name: 3c · Regex, excluding one host
+      type: http
+      description: Any https host except localhost.
+      seq: 5
+    http:
+      url: 'regex:^https://(?!localhost)[^/]+/'
+    runtime:
+      assertions:
+        - { description: 'host is present', expression: req.host, operator: isNotEmpty }
+
+  # 3d. Narrowed to one verb.
+  - info:
+      name: 3d · Method
+      type: http
+      description: GET requests only.
+      seq: 6
+    http:
+      url: '*'
+      method: GET
+    runtime:
+      assertions:
+        - { description: 'this really is a GET', expression: req.method, operator: equals, value: GET }
+
+  # 3e. Narrowed by resource type. Tags carry the types an item covers.
+  - info:
+      name: 3e · Tags · documents and frames
+      type: http
+      description: Top-level documents only.
+      seq: 7
+      tags:
+        - document
+    http:
+      url: '*'
+    runtime:
+      assertions:
+        - { description: 'a document is html', expression: "res.headers['content-type']", operator: contains, value: text/html }
+
+  - info:
+      name: 3f · Tags · scripts, styles, images, fonts, media
+      type: http
+      description: Static assets. Every remaining resource type is listed here.
+      seq: 8
+      tags:
+        - script
+        - stylesheet
+        - image
+        - font
+        - media
+        - other
+        - ping
+        - manifest
+        - websocket
+    http:
+      url: '*'
+    runtime:
+      assertions:
+        - { description: 'assets are fetched over TLS', expression: req.url, operator: startsWith, value: 'https://' }
+
+  # 3g. The API shape: fetch and XHR against one host, with every http field the
+  #     schema allows. Only `url` and `method` are read; the rest prove they are
+  #     tolerated.
+  - info:
+      name: 3g · API traffic
+      type: http
+      description: Retarget the url at an API you call, then reload the page.
+      seq: 9
+      tags:
+        - fetch
+        - xhr
+        - preflight
+    http:
+      url: '*.api.example.com'
+      headers:
+        - { name: accept, value: application/json }
+      params:
+        - { name: page, value: '1', type: query }
+    runtime:
+      assertions:
+        - { description: 'answered from an approved EU region', expression: "res.headers['x-data-region']", operator: in, value: 'eu-west-1, eu-central-1' }
+
+  # ===========================================================================
+  # 3h. CORS preflights. They are rows of their own, so they need their own
+  #     item: the OPTIONS carries none of the application's response headers,
+  #     and judging it with 3g's assertions would fail every compliant call.
+  #     Tick "Preflights" in the toolbar to see these rows.
+  # ===========================================================================
+  - info:
+      name: 3h · CORS preflights
+      type: http
+      description: Judges the OPTIONS itself. Tick "Preflights" in the toolbar to see the rows.
+      seq: 10
+      tags:
+        - preflight
+    http:
+      url: '*'
+      method: OPTIONS
+    runtime:
+      assertions:
+        - { description: 'a preflight is an OPTIONS', expression: req.method, operator: equals, value: OPTIONS }
+        - { description: 'the preflight was accepted', expression: res.status, operator: lt, value: '300' }
+        - { description: 'it named an allowed origin', expression: "res.headers['access-control-allow-origin']", operator: isNotEmpty }
+        - { description: 'and it came from a real responder', expression: res.ip, operator: isNotEmpty }
+
+  # ===========================================================================
+  # 4. A folder. It nests items and carries no rules of its own, because the
+  #    schema gives it none. Its name prefixes the items inside it.
+  # ===========================================================================
+  - info:
+      name: 4 · Folder
+      type: folder
+      description: Grouping only.
+      seq: 11
+    items:
+      - info:
+          name: Nested item
+          type: http
+          description: Shows as "4 · Folder / Nested item" in the panel.
+          seq: 1
+        http:
+          url: '*'
+        runtime:
+          assertions:
+            - { description: 'nested items are judged normally', expression: req.url, operator: isNotEmpty }
+
+  # ===========================================================================
+  # 5. Expressions. One assertion per readable path, so the Assertions tab shows
+  #    what each one actually resolved to.
+  # ===========================================================================
+  - info:
+      name: 5 · Every expression
+      type: http
+      description: Each assertion names the path it reads; check `actual` in the detail pane.
+      seq: 12
+    http:
+      url: '*'
+    runtime:
+      assertions:
+        - { description: 'req.method', expression: req.method, operator: isDefined }
+        - { description: 'req.url', expression: req.url, operator: isDefined }
+        - { description: 'req.host', expression: req.host, operator: isDefined }
+        - { description: 'req.domain', expression: req.domain, operator: isDefined }
+        - { description: 'req.path', expression: req.path, operator: isDefined }
+        - { description: 'req.type', expression: req.type, operator: isDefined }
+        - { description: "req.query['q'] — undefined unless present", expression: "req.query['q']", operator: isDefined, disabled: true }
+        - { description: "req.headers['accept']", expression: "req.headers['accept']", operator: isDefined, disabled: true }
+        - { description: 'req.body — needs a request payload', expression: req.body, operator: isDefined, disabled: true }
+        - { description: 'res.status', expression: res.status, operator: isDefined }
+        - { description: "res.headers['content-type']", expression: "res.headers['content-type']", operator: isDefined, disabled: true }
+        - { description: 'res.ip', expression: res.ip, operator: isDefined }
+        - { description: 'res.protocol', expression: res.protocol, operator: isDefined }
+        - { description: 'res.responseTime', expression: res.responseTime, operator: isDefined }
+        - { description: 'res.fromCache', expression: res.fromCache, operator: isDefined }
+        - { description: 'res.error — set only when a request failed', expression: res.error, operator: isUndefined }
+        - { description: 'res.body — pulling this makes the panel fetch payloads', expression: res.body, operator: isDefined, disabled: true }
+        - { description: 'res.bodyText', expression: res.bodyText, operator: isDefined, disabled: true }
+
+  # ===========================================================================
+  # 6. Scripts. Only `type: tests` exists; a script takes `type` and `code`.
+  # ===========================================================================
+  - info:
+      name: 6 · Scripts
+      type: http
+      description: Runs in a sandbox with no browser, extension or network access.
+      seq: 13
+    http:
+      url: '*'
+    runtime:
+      scripts:
+        - type: tests
+          code: |-
+            // Several tests in one script, each reported on its own.
+            test("status is a number in range", function () {
+              expect(res.status).to.be.a('number');
+              expect(res.status).to.be.within(100, 599);
+            });
+
+            test("url and host agree", function () {
+              expect(req.url).to.contain(req.host);
+            });
+
+            test("chai deep and property matchers work", function () {
+              expect({ region: 'eu-west-1' }).to.deep.equal({ region: 'eu-west-1' });
+              expect({ region: 'eu-west-1' }).to.have.property('region', 'eu-west-1');
+            });
+
+            // Decoding is why scripts exist: no fixed operator could do this.
+            test("an Authorization header, when present, is a Bearer token", function () {
+              const auth = req.headers['authorization'];
+              if (auth === undefined) {
+                return; // nothing to check on this request
+              }
+              expect(auth).to.match(/^Bearer /);
+              const payload = auth.slice('Bearer '.length).split('.')[1];
+              if (payload !== undefined) {
+                const claims = JSON.parse(atob(payload));
+                expect(claims).to.be.an('object');
+              }
+            });
+
+  # ===========================================================================
+  # 7. Meant to fail. Enable this item to see red rows, the badge count and the
+  #    failing facet. Change the url to a host you are actually loading.
+  # ===========================================================================
+  - info:
+      name: 7 · Expected failures
+      type: http
+      description: Deliberately wrong, so failure states can be seen. Retarget the url.
+      seq: 14
+    http:
+      url: 'regex:^https://never-matches-anything\.invalid/'
+    runtime:
+      assertions:
+        - { description: 'this is supposed to fail', expression: res.status, operator: equals, value: '999' }
+      scripts:
+        - type: tests
+          code: |-
+            test("a failing test, so the message can be read", function () {
+              expect(res.status).to.equal(999);
+            });
+
+            test("a test that throws outside an assertion", function () {
+              notDefinedAnywhere.boom();
+            });
+
+  # ===========================================================================
+  # 8. Runaway script — CONTAINMENT CHECK.
+  #    Left commented out on purpose. Uncomment, save, reload a page, and watch
+  #    what the DevTools window does for the two seconds before the batch
+  #    deadline replaces the frame.
+  # ===========================================================================
+  # - info:
+  #     name: 8 · Runaway
+  #     type: http
+  #     seq: 15
+  #   http:
+  #     url: '*'
+  #   runtime:
+  #     scripts:
+  #       - type: tests
+  #         code: 'while (true) {}'
+
+# --- extensions -------------------------------------------------------------
+# The schema's own escape hatch, and the only place a field it does not define
+# is allowed to live. Every setting this extension reads is here.
+extensions:
+  residency:
+    # 'host' groups the report by exact hostname, 'domain' by approximate eTLD+1.
+    grouping: host
+    # Discard a tab's captures when its top-level document navigates.
+    clearOnNavigate: true
+    # Keep requests no item scopes; they are reported as "not applicable".
+    recordUnscoped: true
+    # Record every tab on sight rather than waiting to be asked.
+    recordByDefault: false
+    # Verbose diagnostics in the service worker console.
+    debug: false
